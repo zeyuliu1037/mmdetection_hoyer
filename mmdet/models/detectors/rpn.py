@@ -46,10 +46,10 @@ class RPN(BaseDetector):
             list[torch.Tensor]: Multi-level features that may have
                 different resolutions.
         """
-        x = self.backbone(img)
+        x, hoyer_loss = self.backbone(img)
         if self.with_neck:
             x = self.neck(x)
-        return x
+        return x, hoyer_loss
 
     def forward_dummy(self, img):
         """Dummy forward function."""
@@ -83,9 +83,10 @@ class RPN(BaseDetector):
                 and self.train_cfg.rpn.get('debug', False)):
             self.rpn_head.debug_imgs = tensor2imgs(img)
 
-        x = self.extract_feat(img)
+        x, hoyer_loss = self.extract_feat(img)
         losses = self.rpn_head.forward_train(x, img_metas, gt_bboxes, None,
                                              gt_bboxes_ignore)
+        losses.update(dict(hoyer_loss=hoyer_loss))
         return losses
 
     def simple_test(self, img, img_metas, rescale=False):

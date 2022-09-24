@@ -14,14 +14,14 @@ from .point_sample import (get_uncertain_point_coords_with_randomness,
                            get_uncertainty)
 from .positional_encoding import (LearnedPositionalEncoding,
                                   SinePositionalEncoding)
-from .res_layer import ResLayer, SimplifiedBasicBlock
+from .res_layer import ResLayer, HoyerBiAct, HoyerLayer, SimplifiedBasicBlock
 from .se_layer import DyReLU, SELayer
 from .transformer import (DetrTransformerDecoder, DetrTransformerDecoderLayer,
                           DynamicConv, PatchEmbed, Transformer, nchw_to_nlc,
                           nlc_to_nchw)
 
 __all__ = [
-    'ResLayer', 'gaussian_radius', 'gen_gaussian_target',
+    'ResLayer', 'HoyerBiAct', 'HoyerLayer', 'gaussian_radius', 'gen_gaussian_target',
     'DetrTransformerDecoderLayer', 'DetrTransformerDecoder', 'Transformer',
     'build_transformer', 'build_linear_layer', 'SinePositionalEncoding',
     'LearnedPositionalEncoding', 'DynamicConv', 'SimplifiedBasicBlock',

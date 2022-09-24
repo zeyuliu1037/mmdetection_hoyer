@@ -1,18 +1,34 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import os.path as osp
+import math
 
 import mmcv
 import numpy as np
 import pycocotools.mask as maskUtils
 
 from mmdet.core import BitmapMasks, PolygonMasks
-from ..builder import PIPELINES
+from mmdet.datasets.builder import PIPELINES
+import cv2
 
 try:
     from panopticapi.utils import rgb2id
 except ImportError:
     rgb2id = None
 
+
+def demosaic(raw):
+    H, W = raw.shape
+    if H%2 == 1:
+        H = H - 1
+    if W%2 == 1:
+        W = W - 1
+    de_raw = np.zeros((math.floor(H/2), math.floor(W/2), 3))
+
+    de_raw[0:H:1, 0:W:1, 0] = raw[0:H:2, 0:W:2]
+    de_raw[0:H:1, 0:W:1, 2] = raw[1:H:2, 1:W:2]
+    de_raw[0:H:1, 0:W:1, 1] = (raw[0:H:2, 1:W:2] + raw[1:H:2, 0:W:2])/2
+
+    return de_raw
 
 @PIPELINES.register_module()
 class LoadImageFromFile:
@@ -86,7 +102,243 @@ class LoadImageFromFile:
                     f'file_client_args={self.file_client_args})')
         return repr_str
 
+@PIPELINES.register_module()
+class LoadImageFromFileDemosaic:
+    """Load an image from file.
 
+    Required keys are "img_prefix" and "img_info" (a dict that must contain the
+    key "filename"). Added or updated keys are "filename", "img", "img_shape",
+    "ori_shape" (same as `img_shape`), "pad_shape" (same as `img_shape`),
+    "scale_factor" (1.0) and "img_norm_cfg" (means=0 and stds=1).
+
+    Args:
+        to_float32 (bool): Whether to convert the loaded image to a float32
+            numpy array. If set to False, the loaded image is an uint8 array.
+            Defaults to False.
+        color_type (str): The flag argument for :func:`mmcv.imfrombytes`.
+            Defaults to 'color'.
+        file_client_args (dict): Arguments to instantiate a FileClient.
+            See :class:`mmcv.fileio.FileClient` for details.
+            Defaults to ``dict(backend='disk')``.
+    """
+
+    def __init__(self,
+                 to_float32=False,
+                 color_type='color',
+                 channel_order='bgr',
+                 file_client_args=dict(backend='disk')):
+        self.to_float32 = to_float32
+        self.color_type = color_type
+        self.channel_order = channel_order
+        self.file_client_args = file_client_args.copy()
+        self.file_client = None
+
+    def __call__(self, results):
+        """Call functions to load image and get image meta information.
+
+        Args:
+            results (dict): Result dict from :obj:`mmdet.CustomDataset`.
+
+        Returns:
+            dict: The dict contains loaded image and meta information.
+        """
+
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+
+        if results['img_prefix'] is not None:
+            filename = osp.join(results['img_prefix'],
+                                results['img_info']['filename'])
+        else:
+            filename = results['img_info']['filename']
+
+        img_bytes = self.file_client.get(filename)
+        img = mmcv.imfrombytes(
+            img_bytes, flag=self.color_type, channel_order=self.channel_order)
+        # print('img shape: {}, min: {}, max: {}'.format(img.shape, np.min(img), np.max(img)))
+        img = demosaic(img[:,:,0])
+        # print('img shape: {}, min: {}, max: {}'.format(img.shape, np.min(img), np.max(img)))
+        # print(np.sum(img[:,:,0]-img[:,:,1]), np.sum(img[:,:,0]-img[:,:,2]), np.sum(img[:,:,2]-img[:,:,1]))
+        # exit()
+        if self.to_float32:
+            img = img.astype(np.float32)
+
+        results['filename'] = filename
+        results['ori_filename'] = results['img_info']['filename']
+        results['img'] = img
+        results['img_shape'] = img.shape
+        results['ori_shape'] = img.shape
+        results['img_fields'] = ['img']
+        return results
+
+    def __repr__(self):
+        repr_str = (f'{self.__class__.__name__}('
+                    f'to_float32={self.to_float32}, '
+                    f"color_type='{self.color_type}', "
+                    f"channel_order='{self.channel_order}', "
+                    f'file_client_args={self.file_client_args})')
+        return repr_str
+
+@PIPELINES.register_module()
+class LoadImageFromNpy:
+    """Load an image from file.
+
+    Required keys are "img_prefix" and "img_info" (a dict that must contain the
+    key "filename"). Added or updated keys are "filename", "img", "img_shape",
+    "ori_shape" (same as `img_shape`), "pad_shape" (same as `img_shape`),
+    "scale_factor" (1.0) and "img_norm_cfg" (means=0 and stds=1).
+
+    Args:
+        to_float32 (bool): Whether to convert the loaded image to a float32
+            numpy array. If set to False, the loaded image is an uint8 array.
+            Defaults to False.
+        color_type (str): The flag argument for :func:`mmcv.imfrombytes`.
+            Defaults to 'color'.
+        file_client_args (dict): Arguments to instantiate a FileClient.
+            See :class:`mmcv.fileio.FileClient` for details.
+            Defaults to ``dict(backend='disk')``.
+    """
+
+    def __init__(self,
+                 to_float32=False,
+                 color_type='color',
+                 file_client_args=dict(backend='disk')):
+        self.to_float32 = to_float32
+        self.color_type = color_type
+        self.file_client_args = file_client_args.copy()
+        self.file_client = None
+
+    def __call__(self, results):
+        """Call functions to load image and get image meta information.
+
+        Args:
+            results (dict): Result dict from :obj:`mmdet.CustomDataset`.
+
+        Returns:
+            dict: The dict contains loaded image and meta information.
+        """
+
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+
+        if results['img_prefix'] is not None:
+            filename = osp.join(results['img_prefix'],
+                                results['img_info']['filename'])
+        else:
+            filename = results['img_info']['filename']
+
+        # img_bytes = self.file_client.get(filename)
+        # img = mmcv.imfrombytes(img_bytes, flag=self.color_type)
+        path = filename.split('/')
+        path[-1] = 'raw_pred_' + path[-1][:-3] + 'npy'
+        # path[-1] = path[-1][:-3] + 'npy'
+        path = osp.join(*path)
+        path = '/' + path
+        img = np.load(path)*255.0
+        # img = (img[:,:,0]*0.299 + img[:,:,1]*0.587 + img[:,:,2]*0.114)*255.0
+        img = img.astype(np.uint8)
+        # img = cv2.merge([img,img,img])
+        # image = Image.fromarray((img).astype(np.uint8))
+        # image.save(f'data/coco_1_ch.jpg')
+        # exit()
+        # img = demosaic(img)
+ 
+        # img = np.load(path)
+        # img = scipy.ndimage.zoom(img, [2,2,1])
+        # np.clip(img, 0.0, 255.0, out=img)
+        if self.to_float32:
+            img = img.astype(np.float32)
+        # print('test. shape:{}, min: {}, max: {}, mean: {}'.format(img.shape, np.min(img), np.max(img), np.mean(img)))
+        # exit()
+        results['filename'] = filename
+        results['ori_filename'] = results['img_info']['filename']
+        results['img'] = img
+        results['img_shape'] = img.shape
+        results['ori_shape'] = img.shape
+        results['img_fields'] = ['img']
+        return results
+
+    def __repr__(self):
+        repr_str = (f'{self.__class__.__name__}('
+                    f'to_float32={self.to_float32}, '
+                    f"color_type='{self.color_type}', "
+                    f'file_client_args={self.file_client_args})')
+        return repr_str
+
+@PIPELINES.register_module()
+class LoadImageFromJpg:
+    """Load an image from file.
+
+    Required keys are "img_prefix" and "img_info" (a dict that must contain the
+    key "filename"). Added or updated keys are "filename", "img", "img_shape",
+    "ori_shape" (same as `img_shape`), "pad_shape" (same as `img_shape`),
+    "scale_factor" (1.0) and "img_norm_cfg" (means=0 and stds=1).
+
+    Args:
+        to_float32 (bool): Whether to convert the loaded image to a float32
+            numpy array. If set to False, the loaded image is an uint8 array.
+            Defaults to False.
+        color_type (str): The flag argument for :func:`mmcv.imfrombytes`.
+            Defaults to 'color'.
+        file_client_args (dict): Arguments to instantiate a FileClient.
+            See :class:`mmcv.fileio.FileClient` for details.
+            Defaults to ``dict(backend='disk')``.
+    """
+
+    def __init__(self,
+                 to_float32=False,
+                 color_type='color',
+                 file_client_args=dict(backend='disk')):
+        self.to_float32 = to_float32
+        self.color_type = color_type
+        self.file_client_args = file_client_args.copy()
+        self.file_client = None
+
+    def __call__(self, results):
+        """Call functions to load image and get image meta information.
+
+        Args:
+            results (dict): Result dict from :obj:`mmdet.CustomDataset`.
+
+        Returns:
+            dict: The dict contains loaded image and meta information.
+        """
+
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+
+        if results['img_prefix'] is not None:
+            filename = osp.join(results['img_prefix'],
+                                results['img_info']['filename'])
+        else:
+            filename = results['img_info']['filename']
+
+       
+        path = filename.split('/')
+        path[-1] = 'raw_pred_' + path[-1][:-3] + 'jpg'
+        path = osp.join(*path)
+        path = '/' + path
+        img_bytes = self.file_client.get(path)
+        img = mmcv.imfrombytes(img_bytes, flag=self.color_type)
+
+        if self.to_float32:
+            img = img.astype(np.float32)
+        # print('test. shape:{}, min: {}, max: {}, mean: {}'.format(img.shape, np.min(img), np.max(img), np.mean(img)))
+        # exit()
+        results['filename'] = filename
+        results['ori_filename'] = results['img_info']['filename']
+        results['img'] = img
+        results['img_shape'] = img.shape
+        results['ori_shape'] = img.shape
+        results['img_fields'] = ['img']
+        return results
+
+    def __repr__(self):
+        repr_str = (f'{self.__class__.__name__}('
+                    f'to_float32={self.to_float32}, '
+                    f"color_type='{self.color_type}', "
+                    f'file_client_args={self.file_client_args})')
+        return repr_str
 @PIPELINES.register_module()
 class LoadImageFromWebcam(LoadImageFromFile):
     """Load an image from webcam.

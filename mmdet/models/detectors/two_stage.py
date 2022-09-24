@@ -64,10 +64,10 @@ class TwoStageDetector(BaseDetector):
 
     def extract_feat(self, img):
         """Directly extract features from the backbone+neck."""
-        x = self.backbone(img)
+        x, hoyer_loss = self.backbone(img)
         if self.with_neck:
             x = self.neck(x)
-        return x
+        return x, hoyer_loss
 
     def forward_dummy(self, img):
         """Used for computing network flops.
@@ -124,9 +124,10 @@ class TwoStageDetector(BaseDetector):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        x = self.extract_feat(img)
+        x, hoyer_loss = self.extract_feat(img)
 
         losses = dict()
+        losses.update(dict(hoyer_loss=hoyer_loss*1e-9))
 
         # RPN forward and loss
         if self.with_rpn:
@@ -159,7 +160,7 @@ class TwoStageDetector(BaseDetector):
                                 rescale=False):
         """Async test without augmentation."""
         assert self.with_bbox, 'Bbox head must be implemented.'
-        x = self.extract_feat(img)
+        x, hoyer_loss = self.extract_feat(img)
 
         if proposals is None:
             proposal_list = await self.rpn_head.async_simple_test_rpn(
@@ -174,7 +175,7 @@ class TwoStageDetector(BaseDetector):
         """Test without augmentation."""
 
         assert self.with_bbox, 'Bbox head must be implemented.'
-        x = self.extract_feat(img)
+        x, hoyer_loss = self.extract_feat(img)
         if proposals is None:
             proposal_list = self.rpn_head.simple_test_rpn(x, img_metas)
         else:
@@ -189,7 +190,7 @@ class TwoStageDetector(BaseDetector):
         If rescale is False, then returned bboxes and masks will fit the scale
         of imgs[0].
         """
-        x = self.extract_feats(imgs)
+        x, hoyer_loss = self.extract_feats(imgs)
         proposal_list = self.rpn_head.aug_test_rpn(x, img_metas)
         return self.roi_head.aug_test(
             x, proposal_list, img_metas, rescale=rescale)

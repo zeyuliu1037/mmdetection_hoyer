@@ -14,9 +14,9 @@ from mmcv.utils import print_log
 from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
-from .api_wrappers import COCO, COCOeval
-from .builder import DATASETS
-from .custom import CustomDataset
+from mmdet.datasets.api_wrappers import COCO, COCOeval
+from mmdet.datasets.builder import DATASETS
+from mmdet.datasets.custom import CustomDataset
 
 
 @DATASETS.register_module()
@@ -594,7 +594,8 @@ class CocoDataset(CustomDataset):
                  metric='bbox',
                  logger=None,
                  jsonfile_prefix=None,
-                 classwise=False,
+                #  jsonfile_prefix='work_dirs/coco_raw/frcnn_lr_0.002_frozen/epoch_12',
+                 classwise=True,
                  proposal_nums=(100, 300, 1000),
                  iou_thrs=None,
                  metric_items=None):
@@ -639,6 +640,10 @@ class CocoDataset(CustomDataset):
         self.cat_ids = coco_gt.get_cat_ids(cat_names=self.CLASSES)
 
         result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
+        # result_files = {
+        #     'bbox': 'data/raw_dataset/RAW_converted/annotations/pred_xywh_result.bbox.json',
+        #     'proposal': 'data/raw_dataset/RAW_converted/annotations/pred_xywh_result.bbox.json'
+        # }
         eval_results = self.evaluate_det_segm(results, result_files, coco_gt,
                                               metrics, logger, classwise,
                                               proposal_nums, iou_thrs,

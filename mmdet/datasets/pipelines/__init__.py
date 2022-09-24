@@ -6,7 +6,7 @@ from .compose import Compose
 from .formatting import (Collect, DefaultFormatBundle, ImageToTensor,
                          ToDataContainer, ToTensor, Transpose, to_tensor)
 from .instaboost import InstaBoost
-from .loading import (FilterAnnotations, LoadAnnotations, LoadImageFromFile,
+from .loading import (FilterAnnotations, LoadAnnotations, LoadImageFromFile, LoadImageFromNpy, LoadImageFromFileDemosaic, LoadImageFromJpg,
                       LoadImageFromWebcam, LoadMultiChannelImageFromFiles,
                       LoadPanopticAnnotations, LoadProposals)
 from .test_time_aug import MultiScaleFlipAug
@@ -18,7 +18,7 @@ from .transforms import (Albu, CopyPaste, CutOut, Expand, MinIoURandomCrop,
 
 __all__ = [
     'Compose', 'to_tensor', 'ToTensor', 'ImageToTensor', 'ToDataContainer',
-    'Transpose', 'Collect', 'DefaultFormatBundle', 'LoadAnnotations',
+    'Transpose', 'Collect', 'DefaultFormatBundle', 'LoadAnnotations', 'LoadImageFromNpy', 'LoadImageFromFileDemosaic', 'LoadImageFromJpg',
     'LoadImageFromFile', 'LoadImageFromWebcam', 'LoadPanopticAnnotations',
     'LoadMultiChannelImageFromFiles', 'LoadProposals', 'FilterAnnotations',
     'MultiScaleFlipAug', 'Resize', 'RandomFlip', 'Pad', 'RandomCrop',
